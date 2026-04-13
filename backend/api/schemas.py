@@ -35,7 +35,7 @@ class ProcessResponse(BaseModel):
 # ─── Query ────────────────────────────────────────────────────────────────────
 
 class QueryRequest(BaseModel):
-    query: str = Field(..., min_length=3, description="User question")
+    query: str = Field(..., min_length=1, description="User question")
     stream: bool = Field(default=True, description="Use SSE streaming")
     filter_doc_ids: Optional[list[str]] = Field(
         default=None, description="Restrict search to specific document IDs"

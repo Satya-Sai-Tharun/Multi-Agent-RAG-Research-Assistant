@@ -87,4 +87,4 @@ class TestSchemas:
         from api.schemas import QueryRequest
         import pydantic
         with pytest.raises(pydantic.ValidationError):
-            QueryRequest(query="Hi")  # min_length=3 → "Hi" is only 2
+            QueryRequest(query="")  # min_length=1 → empty strings are still invalid
