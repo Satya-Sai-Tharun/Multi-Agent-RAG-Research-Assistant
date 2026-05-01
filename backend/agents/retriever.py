@@ -84,6 +84,7 @@ class RetrieverAgent(BaseAgent):
                 self.log_error("Got empty embedding — Ollama embedding model may not be running")
                 return []
             return vector_store.similarity_search(
+                query_text=query,
                 query_embedding=embedding,
                 top_k=top_k,
                 filter_doc_ids=filter_doc_ids,

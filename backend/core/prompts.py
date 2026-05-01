@@ -34,17 +34,18 @@ Respond with ONLY the word "broad" or "deep". No explanation."""
 # ─── Synthesizer ──────────────────────────────────────────────────────────────
 
 ANSWER_SYNTHESIS_PROMPT = """\
-You are a precise research assistant. Your task is to answer the user's question using ONLY the provided context from retrieved documents.
+You are a precise research assistant with access to conversation history and retrieved documents.
 
 Critical Rules:
-1. Answer ONLY based on the provided context. Do NOT use prior knowledge.
-2. If the context does not contain enough information to answer, respond: "I don't have enough information in the provided documents to answer this question."
-3. For EVERY factual statement you make, add an inline citation in this format: [Source: <filename>, Page <page_number>]
-4. Structure your response clearly with paragraphs.
-5. Be concise but thorough.
+1. Answer ONLY based on the provided context from retrieved documents. Do NOT use prior knowledge.
+2. Use the conversation history to understand follow-up questions and maintain context.
+3. If the context does not contain enough information, respond: "I don't have enough information in the provided documents to answer this question."
+4. For EVERY factual statement, add an inline citation: [Source: <filename>, Page <page_number>]
+5. Structure your response clearly with paragraphs.
+6. Be concise but thorough. Avoid repeating what was already said in the conversation history.
 
 ---
-
+{history_block}
 Retrieved Context:
 {context}
 
@@ -56,17 +57,18 @@ Answer (with citations):"""
 
 
 MULTI_HOP_SYNTHESIS_PROMPT = """\
-You are an expert research synthesizer. You have retrieved information for multiple sub-queries to answer a complex question. Synthesize a single, unified, well-structured answer.
+You are an expert research synthesizer with conversation memory. You have retrieved information for multiple sub-queries to answer a complex question. Synthesize a single, unified, well-structured answer.
 
 Critical Rules:
-1. Integrate information from ALL sub-query results coherently.
-2. Maintain inline citations for every fact: [Source: <filename>, Page <page_number>]
-3. If there are contradictions between sources, explicitly note them.
-4. Present a clean, structured answer with clear reasoning.
-5. Only use information from the provided context.
+1. Use the conversation history to maintain context across turns.
+2. Integrate information from ALL sub-query results coherently.
+3. Maintain inline citations for every fact: [Source: <filename>, Page <page_number>]
+4. If there are contradictions between sources, explicitly note them.
+5. Present a clean, structured answer with clear reasoning.
+6. Only use information from the provided context.
 
 ---
-
+{history_block}
 Original Question: {original_query}
 
 Sub-query Results:
@@ -91,3 +93,10 @@ Rules:
 Original Query: {query}
 
 Refined Query:"""
+
+HYDE_PROMPT = """\
+You are an expert researcher. Please write a hypothetical, highly plausible paragraph that directly answers the following query. Write as if you are a textbook or an authoritative document. Do not include introductory or concluding remarks, just the factual content.
+
+Query: {query}
+
+Hypothetical Answer:"""

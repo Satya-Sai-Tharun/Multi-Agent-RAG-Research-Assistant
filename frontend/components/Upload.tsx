@@ -1,16 +1,16 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Upload, Link2, FileText, Loader2, CheckCircle2, AlertCircle, X } from "lucide-react";
+import { Upload, Link2, FileText, Loader2, CheckCircle2, AlertCircle, X, ChevronRight } from "lucide-react";
 import { uploadPDF, uploadURL, UploadResponse } from "@/lib/api";
 
 interface UploadWidgetProps {
-  onUploadSuccess: (response: UploadResponse) => void;
+  onSuccess?: () => void;
 }
 
 type UploadMode = "file" | "url";
 
-export default function UploadWidget({ onUploadSuccess }: UploadWidgetProps) {
+export default function UploadWidget({ onSuccess }: UploadWidgetProps) {
   const [mode, setMode] = useState<UploadMode>("file");
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +27,7 @@ export default function UploadWidget({ onUploadSuccess }: UploadWidgetProps) {
   // ─── PDF Upload ────────────────────────────────────────────────────────────
   const handleFile = useCallback(async (file: File) => {
     if (!file.name.toLowerCase().endsWith(".pdf")) {
-      setError("Only PDF files are supported.");
+      setError("Only PDF files are supported at this time.");
       return;
     }
     resetState();
@@ -35,14 +35,14 @@ export default function UploadWidget({ onUploadSuccess }: UploadWidgetProps) {
 
     try {
       const result = await uploadPDF(file, setStatusMsg);
-      setStatusMsg(`✓ Ingested ${result.chunks_processed} chunks`);
-      onUploadSuccess(result);
+      setStatusMsg(`Ingested ${result.chunks_processed} chunks successfully`);
+      onSuccess?.();
     } catch (err: unknown) {
       setError((err as Error).message || "Upload failed");
     } finally {
       setIsLoading(false);
     }
-  }, [onUploadSuccess]);
+  }, [onSuccess]);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -61,52 +61,56 @@ export default function UploadWidget({ onUploadSuccess }: UploadWidgetProps) {
     if (!url.trim()) return;
     resetState();
     setIsLoading(true);
-    setStatusMsg("Fetching URL content...");
+    setStatusMsg("Fetching and processing content...");
 
     try {
       const result = await uploadURL(url.trim());
-      setStatusMsg(`✓ Ingested ${result.chunks_processed} chunks from URL`);
-      onUploadSuccess(result);
+      setStatusMsg(`Ingested ${result.chunks_processed} chunks from source`);
+      onSuccess?.();
       setUrl("");
     } catch (err: unknown) {
-      setError((err as Error).message || "URL ingestion failed");
+      setError((err as Error).message || "Source ingestion failed");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="glass-card p-5">
-      <h2 className="text-base font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-        <Upload size={16} className="text-[var(--accent-primary)]" />
-        Add Documents
-      </h2>
+    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-xs)" }} className="p-4 animate-in">
+      <div className="flex items-center gap-2 mb-4">
+        <Upload size={13} style={{ color: "var(--accent-primary)" }} />
+        <h2 className="text-[11px] font-bold tracking-widest uppercase" style={{ color: "var(--text-muted)" }}>
+          Add Source
+        </h2>
+      </div>
 
       {/* Mode Toggle */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex p-1 mb-4 gap-1" style={{ background: "var(--bg-input)", borderRadius: "var(--radius-xs)" }}>
         <button
           id="upload-mode-file"
-          className={`btn-ghost flex-1 justify-center rounded-lg py-2 text-xs ${
-            mode === "file"
-              ? "!bg-[rgba(99,102,241,0.12)] !text-[var(--accent-primary)] !border !border-[rgba(99,102,241,0.3)]"
-              : ""
-          }`}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[12px] font-medium transition-all`}
+          style={{
+            borderRadius: "3px",
+            background: mode === "file" ? "var(--bg-card-high)" : "transparent",
+            color: mode === "file" ? "var(--text-primary)" : "var(--text-muted)",
+          }}
           onClick={() => setMode("file")}
         >
-          <FileText size={13} />
-          PDF
+          <FileText size={11} />
+          Document
         </button>
         <button
           id="upload-mode-url"
-          className={`btn-ghost flex-1 justify-center rounded-lg py-2 text-xs ${
-            mode === "url"
-              ? "!bg-[rgba(99,102,241,0.12)] !text-[var(--accent-primary)] !border !border-[rgba(99,102,241,0.3)]"
-              : ""
-          }`}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[12px] font-medium transition-all`}
+          style={{
+            borderRadius: "3px",
+            background: mode === "url" ? "var(--bg-card-high)" : "transparent",
+            color: mode === "url" ? "var(--text-primary)" : "var(--text-muted)",
+          }}
           onClick={() => setMode("url")}
         >
-          <Link2 size={13} />
-          URL
+          <Link2 size={11} />
+          Web Link
         </button>
       </div>
 
@@ -114,7 +118,7 @@ export default function UploadWidget({ onUploadSuccess }: UploadWidgetProps) {
       {mode === "file" && (
         <label
           htmlFor="pdf-upload-input"
-          className={`drop-zone block cursor-pointer ${isDragging ? "drag-over" : ""}`}
+          className={`drop-zone block ${isDragging ? "drag-over" : ""}`}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
@@ -127,19 +131,22 @@ export default function UploadWidget({ onUploadSuccess }: UploadWidgetProps) {
             onChange={handleFileInput}
             disabled={isLoading}
           />
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-2">
             {isLoading ? (
-              <Loader2 size={28} className="animate-spin text-[var(--accent-primary)]" />
+              <div className="spinner" />
             ) : (
-              <div className="w-12 h-12 rounded-xl bg-[rgba(99,102,241,0.1)] flex items-center justify-center">
-                <FileText size={22} className="text-[var(--accent-primary)]" />
+              <div
+                className="w-8 h-8 flex items-center justify-center"
+                style={{ background: "rgba(46,91,255,0.10)", borderRadius: "var(--radius-xs)" }}
+              >
+                <FileText size={15} style={{ color: "var(--accent-primary)" }} />
               </div>
             )}
             <div>
-              <p className="text-sm font-medium text-[var(--text-primary)]">
+              <p className="text-[13px] font-medium" style={{ color: "var(--text-primary)" }}>
                 {isLoading ? "Processing..." : "Drop PDF here"}
               </p>
-              <p className="text-xs text-[var(--text-muted)] mt-1">
+              <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
                 or click to browse (max 50MB)
               </p>
             </div>
@@ -149,43 +156,46 @@ export default function UploadWidget({ onUploadSuccess }: UploadWidgetProps) {
 
       {/* URL Input */}
       {mode === "url" && (
-        <div className="flex flex-col gap-3">
-          <input
-            id="url-upload-input"
-            type="url"
-            className="input-field text-sm"
-            placeholder="https://example.com/article"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleURLSubmit()}
-            disabled={isLoading}
-          />
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2" style={{ background: "var(--bg-input)", border: "1px solid var(--border-medium)", borderRadius: "var(--radius-xs)", padding: "8px 12px" }}>
+            <Link2 size={13} style={{ color: "var(--text-muted)" }} />
+            <input
+              id="url-upload-input"
+              type="url"
+              style={{ background: "transparent", border: "none", outline: "none", flex: 1, fontSize: "13px", color: "var(--text-primary)", fontFamily: "var(--font-inter)" }}
+              placeholder="https://example.com/article"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleURLSubmit()}
+              disabled={isLoading}
+            />
+          </div>
           <button
             id="url-upload-btn"
-            className="btn-primary justify-center"
+            className="btn-primary justify-center w-full py-2"
             onClick={handleURLSubmit}
             disabled={isLoading || !url.trim()}
           >
-            {isLoading ? <Loader2 size={15} className="animate-spin" /> : <Link2 size={15} />}
-            {isLoading ? "Ingesting..." : "Ingest URL"}
+            {isLoading ? <div className="spinner w-4 h-4" /> : <ChevronRight size={13} />}
+            {isLoading ? "Processing..." : "Ingest Source"}
           </button>
         </div>
       )}
 
       {/* Status Messages */}
       {statusMsg && !error && (
-        <div className="mt-3 flex items-center gap-2 text-xs text-[var(--success)] bg-[rgba(16,185,129,0.08)] border border-[rgba(16,185,129,0.2)] rounded-lg px-3 py-2">
-          <CheckCircle2 size={13} />
-          {statusMsg}
+        <div className="mt-3 flex items-start gap-2 text-[12px] p-2.5" style={{ color: "var(--success)", background: "rgba(78,222,163,0.06)", border: "1px solid rgba(78,222,163,0.15)", borderRadius: "var(--radius-xs)" }}>
+          <CheckCircle2 size={13} className="flex-shrink-0" />
+          <span>{statusMsg}</span>
         </div>
       )}
       {error && (
-        <div className="mt-3 flex items-center justify-between text-xs text-[var(--error)] bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] rounded-lg px-3 py-2">
-          <span className="flex items-center gap-2">
-            <AlertCircle size={13} />
-            {error}
-          </span>
-          <button onClick={() => setError(null)}><X size={12} /></button>
+        <div className="mt-3 flex items-start gap-2 text-[12px] p-2.5 relative" style={{ color: "var(--error)", background: "rgba(255,180,171,0.06)", border: "1px solid rgba(255,180,171,0.15)", borderRadius: "var(--radius-xs)" }}>
+          <AlertCircle size={13} className="flex-shrink-0" />
+          <span className="pr-5">{error}</span>
+          <button onClick={() => setError(null)} className="absolute top-2.5 right-2.5 opacity-60 hover:opacity-100 transition-opacity">
+            <X size={11} style={{ color: "var(--error)" }} />
+          </button>
         </div>
       )}
     </div>

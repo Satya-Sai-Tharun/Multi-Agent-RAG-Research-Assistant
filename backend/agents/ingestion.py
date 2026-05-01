@@ -17,6 +17,7 @@ from typing import Optional
 import fitz  # PyMuPDF
 import requests
 from bs4 import BeautifulSoup
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from agents.base import BaseAgent
 from core.config import settings
@@ -32,67 +33,16 @@ class Chunk:
     metadata: dict = field(default_factory=dict)
 
 
-class TextSplitter:
-    """
-    Recursive character text splitter.
-    Tries to split on paragraph, then sentence, then word boundaries
-    to preserve semantic coherence.
-    """
-    SEPARATORS = ["\n\n", "\n", ". ", "! ", "? ", " ", ""]
 
-    def __init__(self, chunk_size: int, chunk_overlap: int):
-        self.chunk_size = chunk_size
-        self.chunk_overlap = chunk_overlap
-
-    def split(self, text: str) -> list[str]:
-        return self._split_recursive(text, self.SEPARATORS)
-
-    def _split_recursive(self, text: str, separators: list[str]) -> list[str]:
-        if len(text) <= self.chunk_size:
-            return [text.strip()] if text.strip() else []
-
-        separator = separators[0] if separators else ""
-        splits = text.split(separator) if separator else list(text)
-
-        chunks = []
-        current = ""
-        for part in splits:
-            candidate = (current + separator + part).strip() if current else part.strip()
-            if len(candidate) <= self.chunk_size:
-                current = candidate
-            else:
-                if current:
-                    chunks.append(current)
-                # Try next separator for the overflow part
-                if len(part) > self.chunk_size and len(separators) > 1:
-                    sub_chunks = self._split_recursive(part, separators[1:])
-                    # Attach overlap from last chunk
-                    if chunks and sub_chunks:
-                        overlap_text = chunks[-1][-self.chunk_overlap:]
-                        sub_chunks[0] = (overlap_text + " " + sub_chunks[0]).strip()
-                    chunks.extend(sub_chunks)
-                    current = ""
-                else:
-                    current = part.strip()
-
-        if current:
-            chunks.append(current)
-
-        # Add overlap: prefix each chunk (except first) with end of previous chunk
-        overlapped = [chunks[0]] if chunks else []
-        for i in range(1, len(chunks)):
-            overlap = chunks[i - 1][-self.chunk_overlap:].strip()
-            overlapped.append((overlap + " " + chunks[i]).strip())
-
-        return [c for c in overlapped if c]
 
 
 class IngestionAgent(BaseAgent):
     def __init__(self):
         super().__init__("IngestionAgent")
-        self.splitter = TextSplitter(
+        self.splitter = RecursiveCharacterTextSplitter(
             chunk_size=settings.chunk_size,
             chunk_overlap=settings.chunk_overlap,
+            separators=["\n\n", "\n", ". ", " ", ""]
         )
 
     async def run(
@@ -131,7 +81,7 @@ class IngestionAgent(BaseAgent):
             page_text = self._clean_text(page_text)
             if not page_text.strip():
                 continue
-            splits = self.splitter.split(page_text)
+            splits = self.splitter.split_text(page_text)
             for i, chunk_text in enumerate(splits):
                 chunks.append(
                     Chunk(

@@ -4,26 +4,35 @@ Loads from environment variables or .env file.
 """
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import Optional
 import os
 
 
 class Settings(BaseSettings):
     # ─── App ─────────────────────────────────────────────────────────
     app_name: str = "Multi-Agent RAG Research Assistant"
-    app_version: str = "1.0.0"
+    app_version: str = "2.0.0"
     debug: bool = Field(default=False)
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     # ─── Ollama ───────────────────────────────────────────────────────
     ollama_base_url: str = Field(default="http://localhost:11434")
-    llm_model: str = Field(default="gemma:2b")          # synthesis / planning
-    embedding_model: str = Field(default="nomic-embed-text")  # embeddings
+    # Upgrade to llama3.2:3b — significantly better reasoning than gemma:2b
+    # while still fast on Apple Silicon / CPU. Falls back to gemma:2b if unavailable.
+    llm_model: str = Field(default="llama3.2:3b")
+    planner_model: str = Field(default="llama3.2:1b") # Faster routing model
+    embedding_model: str = Field(default="nomic-embed-text")
+
+    # ─── LLM Performance Tuning ───────────────────────────────────────
+    llm_temperature: float = Field(default=0.05)     # low = more deterministic/accurate
+    llm_num_ctx: int = Field(default=4096)            # context window (supports long chats)
+    llm_repeat_penalty: float = Field(default=1.15)  # reduce repetition
+    llm_top_p: float = Field(default=0.9)            # nucleus sampling
+    llm_num_predict: int = Field(default=2048)        # max output tokens
 
     # ─── Chunking ─────────────────────────────────────────────────────
-    chunk_size: int = Field(default=500)    # tokens per chunk
-    chunk_overlap: int = Field(default=50)  # overlap between chunks
-    top_k: int = Field(default=5)          # top-k chunks to retrieve
+    chunk_size: int = Field(default=500)
+    chunk_overlap: int = Field(default=50)
+    top_k: int = Field(default=8)   # increased for better recall
 
     # ─── ChromaDB ─────────────────────────────────────────────────────
     chroma_persist_dir: str = Field(default="./chroma_db")
@@ -34,7 +43,7 @@ class Settings(BaseSettings):
     max_file_size_mb: int = Field(default=50)
 
     # ─── Cache ────────────────────────────────────────────────────────
-    cache_max_size: int = Field(default=128)   # LRU cache entries
+    cache_max_size: int = Field(default=128)
     cache_ttl_seconds: int = Field(default=3600)
 
     class Config:

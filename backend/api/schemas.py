@@ -1,9 +1,8 @@
 """
 API Request / Response Schemas (Pydantic v2)
 """
-from datetime import datetime
 from typing import Optional, Any
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 
 # ─── Upload ───────────────────────────────────────────────────────────────────
@@ -35,10 +34,14 @@ class ProcessResponse(BaseModel):
 # ─── Query ────────────────────────────────────────────────────────────────────
 
 class QueryRequest(BaseModel):
-    query: str = Field(..., min_length=3, description="User question")
+    query: str = Field(..., min_length=1, description="User question")
     stream: bool = Field(default=True, description="Use SSE streaming")
     filter_doc_ids: Optional[list[str]] = Field(
         default=None, description="Restrict search to specific document IDs"
+    )
+    conversation_history: Optional[list[dict]] = Field(
+        default=None,
+        description="Prior conversation messages [{role: user|assistant, content: str}]"
     )
 
 
@@ -64,6 +67,7 @@ class DocumentInfo(BaseModel):
     doc_id: str
     name: str
     chunk_count: int
+    status: str = "ready"
     uploaded_at: Optional[str] = None
     source_url: Optional[str] = None
 

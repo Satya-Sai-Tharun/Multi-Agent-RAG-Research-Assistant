@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Brain, Cpu, Layers, CheckCircle2, XCircle, ChevronRight } from "lucide-react";
+import { Cpu, Brain, CheckCircle2, XCircle } from "lucide-react";
 import { checkHealth, HealthStatus } from "@/lib/api";
 
 export default function StatusBar() {
@@ -24,37 +24,41 @@ export default function StatusBar() {
     return () => clearInterval(interval);
   }, [fetchHealth]);
 
+  const connected = !error && health?.ollama_connected;
+
   return (
-    <div className="flex items-center gap-5 px-2">
-      {/* Ollama Status */}
-      <div className="flex items-center gap-2 text-xs">
-        <Cpu size={12} className="text-[var(--text-muted)]" />
-        <span className="text-[var(--text-muted)]">Ollama</span>
-        {error || !health ? (
-          <XCircle size={12} className="text-[var(--error)]" />
-        ) : health.ollama_connected ? (
-          <CheckCircle2 size={12} className="text-[var(--success)]" />
+    <div className="flex items-center gap-3 animate-in">
+      {/* Engine Status */}
+      <div className="flex items-center gap-1.5">
+        <Cpu size={12} style={{ color: "var(--text-muted)" }} />
+        <span
+          className="text-[11px] font-medium tracking-wide"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Engine
+        </span>
+        {connected ? (
+          <CheckCircle2 size={11} style={{ color: "var(--success)" }} />
         ) : (
-          <XCircle size={12} className="text-[var(--error)]" />
+          <XCircle size={11} style={{ color: "var(--error)" }} />
         )}
       </div>
 
-      {/* Chunks in DB */}
       {health && (
-        <div className="flex items-center gap-2 text-xs">
-          <Layers size={12} className="text-[var(--text-muted)]" />
-          <span className="text-[var(--text-muted)]">{health.total_chunks} chunks</span>
-        </div>
-      )}
-
-      {/* Models */}
-      {health && health.models.length > 0 && (
-        <div className="flex items-center gap-2 text-xs hidden sm:flex">
-          <Brain size={12} className="text-[var(--text-muted)]" />
-          <span className="text-[var(--text-muted)] truncate max-w-32" title={health.models.join(", ")}>
-            {health.models[0]}
-          </span>
-        </div>
+        <>
+          <div className="w-px h-3" style={{ background: "var(--border-medium)" }} />
+          {/* Active Model */}
+          <div className="flex items-center gap-1.5">
+            <Brain size={12} style={{ color: "var(--accent-primary)" }} />
+            <span
+              className="text-[11px] font-medium truncate max-w-[120px]"
+              style={{ color: "var(--accent-primary)" }}
+              title={health.models.join(", ")}
+            >
+              {health.models[0] || "No model loaded"}
+            </span>
+          </div>
+        </>
       )}
     </div>
   );

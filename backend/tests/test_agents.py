@@ -3,7 +3,7 @@ Backend test suite — basic smoke tests for agents and API endpoints.
 Run with: pytest backend/tests/ -v
 """
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 
 # ─── Ingestion Agent Tests ────────────────────────────────────────────────────
@@ -87,4 +87,4 @@ class TestSchemas:
         from api.schemas import QueryRequest
         import pydantic
         with pytest.raises(pydantic.ValidationError):
-            QueryRequest(query="Hi")  # min_length=3 → "Hi" is only 2
+            QueryRequest(query="")  # min_length=1 → empty strings are still invalid

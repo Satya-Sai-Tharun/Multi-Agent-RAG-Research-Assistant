@@ -6,9 +6,12 @@ sse-starlette>=1.8.2
 
 # ── Vector DB — NumPy (pure python, Python 3.14 compatible) ───────────────
 numpy>=1.26.0
+scikit-learn>=1.3.0
 
 # ── Local LLM via Ollama ──────────────────────────────────────────────────────
 ollama>=0.2.1
+langgraph>=0.1.10
+langchain-core>=0.2.0
 
 # ── PDF Parsing ───────────────────────────────────────────────────────────────
 pymupdf>=1.24.5
@@ -23,6 +26,8 @@ pydantic>=2.7.4
 pydantic-settings>=2.3.3
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
+langchain-text-splitters>=0.2.0
+nltk>=3.8.1
 python-dotenv>=1.0.1
 aiofiles>=23.2.1
 httpx>=0.27.0

@@ -10,10 +10,10 @@ This ensures 100% compatibility with Python 3.14 without requiring C++ compilers
 import logging
 import os
 import pickle
-import uuid
 from typing import Optional
 
 import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from core.config import settings
 
@@ -26,7 +26,15 @@ class NumpyVectorStore:
     def __init__(self):
         self.persist_path = os.path.join(settings.chroma_persist_dir, "db.pkl")
         self.data = {"ids": [], "embeddings": [], "documents": [], "metadatas": []}
+        self.tfidf_vectorizer = TfidfVectorizer(stop_words='english')
+        self.sparse_matrix = None
         self.load()
+
+    def _rebuild_sparse_index(self):
+        if self.data["documents"]:
+            self.sparse_matrix = self.tfidf_vectorizer.fit_transform(self.data["documents"])
+        else:
+            self.sparse_matrix = None
 
     def save(self):
         """Persist to disk."""
@@ -40,6 +48,7 @@ class NumpyVectorStore:
             try:
                 with open(self.persist_path, "rb") as f:
                     self.data = pickle.load(f)
+                self._rebuild_sparse_index()
                 logger.info(f"VectorStore loaded — {len(self.data['ids'])} chunks.")
             except Exception as e:
                 logger.error(f"Failed to load vector store: {e}")
@@ -78,6 +87,7 @@ class NumpyVectorStore:
                 self.data["documents"].append(chunks[i])
                 self.data["metadatas"].append(metadatas[i])
 
+        self._rebuild_sparse_index()
         self.save()
         logger.info(f"Upserted {len(chunks)} chunks for doc_id={doc_id}")
         return len(chunks)
@@ -85,6 +95,7 @@ class NumpyVectorStore:
     # ─── Similarity Search ────────────────────────────────────────────────────
     def similarity_search(
         self,
+        query_text: str,
         query_embedding: list[float],
         top_k: int = 5,
         filter_doc_ids: Optional[list[str]] = None,
@@ -111,7 +122,18 @@ class NumpyVectorStore:
         db_emb_norm = db_emb / db_norms
 
         # Cosine similarity is the dot product of normalized vectors
-        similarities = np.dot(db_emb_norm, q_emb)
+        dense_scores = np.dot(db_emb_norm, q_emb)
+
+        # Sparse similarity (TF-IDF)
+        sparse_scores = np.zeros(len(dense_scores))
+        if self.sparse_matrix is not None:
+            # Transform query using fitted vectorizer
+            q_sparse = self.tfidf_vectorizer.transform([query_text])
+            # dot product of sparse matrix (docs x vocab) with q_sparse.T (vocab x 1)
+            sparse_scores = self.sparse_matrix.dot(q_sparse.T).toarray().flatten()
+
+        # Hybrid Score: 70% Dense, 30% Sparse (Adjustable)
+        similarities = (dense_scores * 0.7) + (sparse_scores * 0.3)
 
         # Get sorted indices (descending)
         sorted_indices = np.argsort(similarities)[::-1]

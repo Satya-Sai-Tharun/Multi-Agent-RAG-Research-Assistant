@@ -7,7 +7,7 @@ Responsibilities:
   - Ensure grounded, hallucination-minimized responses with inline citations
 """
 import logging
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 
 from agents.base import BaseAgent
 from core.ollama_client import ollama_client
@@ -20,6 +20,17 @@ class SynthesizerAgent(BaseAgent):
     def __init__(self):
         super().__init__("SynthesizerAgent")
 
+    def _format_history(self, history: list[dict]) -> str:
+        """Format conversation history into a readable block for the prompt."""
+        if not history:
+            return ""
+        lines = ["Previous Conversation:"]
+        for msg in history:
+            role = "User" if msg.get("role") == "user" else "Assistant"
+            lines.append(f"{role}: {msg.get('content', '')}")
+        lines.append("")
+        return "\n".join(lines) + "\n---\n"
+
     # ─── Streaming Answer ─────────────────────────────────────────────────────
     async def run_stream(
         self,
@@ -27,12 +38,14 @@ class SynthesizerAgent(BaseAgent):
         query: str,
         plan: dict,
         retrieval_result: dict,
+        conversation_history: list[dict] | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Async generator that yields answer tokens as they stream from Ollama.
         """
         chunks = retrieval_result.get("retrieved_chunks", [])
         is_multi_hop = plan.get("is_multi_hop", False)
+        history = conversation_history or []
 
         if not chunks:
             yield "I couldn't find any relevant information in the uploaded documents to answer your question."
@@ -42,13 +55,17 @@ class SynthesizerAgent(BaseAgent):
             prompt = self._build_multi_hop_prompt(
                 original_query=query,
                 sub_query_results=retrieval_result.get("sub_query_results", []),
+                history=history,
             )
         else:
             context = self._format_context(chunks)
-            prompt = ANSWER_SYNTHESIS_PROMPT.format(context=context, question=query)
+            history_block = self._format_history(history)
+            prompt = ANSWER_SYNTHESIS_PROMPT.format(
+                history_block=history_block, context=context, question=query
+            )
 
-        self.log_info(f"Synthesizing answer | multi-hop={is_multi_hop} | chunks={len(chunks)}")
-        async for token in ollama_client.stream_generate(prompt, temperature=0.1):
+        self.log_info(f"Synthesizing answer | multi-hop={is_multi_hop} | chunks={len(chunks)} | history={len(history)}")
+        async for token in ollama_client.stream_generate(prompt, temperature=0.05):
             yield token
 
     # ─── Non-Streaming Answer ─────────────────────────────────────────────────
@@ -58,6 +75,7 @@ class SynthesizerAgent(BaseAgent):
         query: str,
         plan: dict,
         retrieval_result: dict,
+        conversation_history: list[dict] | None = None,
     ) -> dict:
         """
         Non-streaming synchronous call.
@@ -65,6 +83,7 @@ class SynthesizerAgent(BaseAgent):
         """
         chunks = retrieval_result.get("retrieved_chunks", [])
         is_multi_hop = plan.get("is_multi_hop", False)
+        history = conversation_history or []
 
         if not chunks:
             return {
@@ -76,12 +95,16 @@ class SynthesizerAgent(BaseAgent):
             prompt = self._build_multi_hop_prompt(
                 original_query=query,
                 sub_query_results=retrieval_result.get("sub_query_results", []),
+                history=history,
             )
         else:
             context = self._format_context(chunks)
-            prompt = ANSWER_SYNTHESIS_PROMPT.format(context=context, question=query)
+            history_block = self._format_history(history)
+            prompt = ANSWER_SYNTHESIS_PROMPT.format(
+                history_block=history_block, context=context, question=query
+            )
 
-        answer = await ollama_client.generate(prompt, temperature=0.1)
+        answer = await ollama_client.generate(prompt, temperature=0.05)
         citations = self._extract_citations(chunks)
         return {"answer": answer, "citations": citations}
 
@@ -101,9 +124,10 @@ class SynthesizerAgent(BaseAgent):
         return "\n\n---\n\n".join(parts)
 
     def _build_multi_hop_prompt(
-        self, original_query: str, sub_query_results: list[dict]
+        self, original_query: str, sub_query_results: list[dict], history: list[dict] | None = None
     ) -> str:
         """Build prompt for multi-hop synthesis."""
+        history_block = self._format_history(history or [])
         sub_results_text = ""
         for i, sr in enumerate(sub_query_results, start=1):
             sq = sr.get("sub_query", "")
@@ -112,6 +136,7 @@ class SynthesizerAgent(BaseAgent):
             sub_results_text += f"\n\n### Sub-query {i}: {sq}\n\n{context}"
 
         return MULTI_HOP_SYNTHESIS_PROMPT.format(
+            history_block=history_block,
             original_query=original_query,
             sub_results=sub_results_text,
         )
