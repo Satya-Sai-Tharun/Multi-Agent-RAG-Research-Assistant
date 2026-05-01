@@ -36,6 +36,7 @@ from agents.ingestion import ingestion_agent
 from agents.planner import query_planner_agent
 from agents.retriever import retriever_agent
 from agents.synthesizer import synthesizer_agent
+from agents.workflow import query_workflow, retrieval_workflow
 from core.config import settings
 from core.ollama_client import ollama_client
 from db.vector_store import vector_store
@@ -161,13 +162,15 @@ async def query_documents(body: QueryRequest, request: Request):
             detail="No documents ingested yet. Please upload at least one document.",
         )
 
-    # Step 1: Plan
-    plan = await query_planner_agent.run(body.query)
-
-    # Step 2: Retrieve
-    retrieval_result = await retriever_agent.run(
-        plan=plan, filter_doc_ids=body.filter_doc_ids
-    )
+    # Execute LangGraph Workflow up to Retrieval
+    initial_state = {
+        "query": body.query,
+        "filter_doc_ids": body.filter_doc_ids,
+        "conversation_history": body.conversation_history or []
+    }
+    state = await retrieval_workflow.ainvoke(initial_state)
+    plan = state["plan"]
+    retrieval_result = state["retrieval_result"]
 
     if body.stream:
         async def event_generator():
@@ -188,6 +191,7 @@ async def query_documents(body: QueryRequest, request: Request):
                 query=body.query,
                 plan=plan,
                 retrieval_result=retrieval_result,
+                conversation_history=body.conversation_history or [],
             ):
                 if await request.is_disconnected():
                     break
@@ -198,15 +202,12 @@ async def query_documents(body: QueryRequest, request: Request):
         return EventSourceResponse(event_generator())
 
     else:
-        result = await synthesizer_agent.run(
-            query=body.query,
-            plan=plan,
-            retrieval_result=retrieval_result,
-        )
+        # For non-streaming, execute the full workflow
+        state = await query_workflow.ainvoke(initial_state)
         return QueryResponse(
             query=body.query,
-            answer=result["answer"],
-            citations=[c for c in result["citations"]],
+            answer=state["answer"],
+            citations=[c for c in state["citations"]],
             sub_queries=plan["sub_queries"],
             is_multi_hop=plan["is_multi_hop"],
             strategy=plan["strategy"],

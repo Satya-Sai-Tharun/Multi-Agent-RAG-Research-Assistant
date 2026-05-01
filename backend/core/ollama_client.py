@@ -7,6 +7,8 @@ Ollama client wrapper for all LLM interactions:
 import json
 import logging
 from typing import AsyncGenerator, Optional
+import hashlib
+from cachetools import TTLCache
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import httpx
 
@@ -22,7 +24,18 @@ class OllamaClient:
         self.base_url = settings.ollama_base_url
         self.llm_model = settings.llm_model
         self.embedding_model = settings.embedding_model
-        self._client = httpx.AsyncClient(timeout=120.0)
+        self._client = httpx.AsyncClient(timeout=180.0)
+        self._cache = TTLCache(maxsize=500, ttl=3600)  # 1 hour cache
+
+    def _llm_options(self, temperature: float, max_tokens: int) -> dict:
+        """Build Ollama options dict from settings + call-time overrides."""
+        return {
+            "temperature": temperature,
+            "num_predict": max_tokens,
+            "num_ctx": settings.llm_num_ctx,
+            "repeat_penalty": settings.llm_repeat_penalty,
+            "top_p": settings.llm_top_p,
+        }
 
     # ─── Health Check ──────────────────────────────────────────────────────────
     async def health_check(self) -> bool:
@@ -54,28 +67,38 @@ class OllamaClient:
         self,
         prompt: str,
         model: Optional[str] = None,
-        temperature: float = 0.1,
+        temperature: float = 0.05,
         max_tokens: int = 2048,
     ) -> str:
         """Synchronous (non-streaming) text generation."""
         model = model or self.llm_model
+        
+        # Check cache first
+        cache_key = hashlib.md5(f"{model}_{prompt}_{temperature}_{max_tokens}".encode()).hexdigest()
+        if cache_key in self._cache:
+            logger.info("LLM Cache hit")
+            return self._cache[cache_key]
+
         payload = {
             "model": model,
             "prompt": prompt,
             "stream": False,
-            "options": {
-                "temperature": temperature,
-                "num_predict": max_tokens,
-            },
+            "options": self._llm_options(temperature, max_tokens),
         }
         try:
             resp = await self._client.post(
                 f"{self.base_url}/api/generate",
                 json=payload,
-                timeout=120.0,
+                timeout=180.0,
             )
             resp.raise_for_status()
-            return resp.json().get("response", "")
+            response_text = resp.json().get("response", "")
+            
+            # Cache the response
+            if temperature < 0.2: # Only cache low temp responses (like planners)
+                self._cache[cache_key] = response_text
+                
+            return response_text
         except httpx.HTTPStatusError as e:
             logger.error(f"Ollama generate failed [{e.response.status_code}]: {e}")
             raise
@@ -84,7 +107,7 @@ class OllamaClient:
         self,
         prompt: str,
         model: Optional[str] = None,
-        temperature: float = 0.1,
+        temperature: float = 0.05,
         max_tokens: int = 2048,
     ) -> AsyncGenerator[str, None]:
         """Streaming text generation — yields tokens as they are produced."""
@@ -93,10 +116,7 @@ class OllamaClient:
             "model": model,
             "prompt": prompt,
             "stream": True,
-            "options": {
-                "temperature": temperature,
-                "num_predict": max_tokens,
-            },
+            "options": self._llm_options(temperature, max_tokens),
         }
         async with self._client.stream(
             "POST",

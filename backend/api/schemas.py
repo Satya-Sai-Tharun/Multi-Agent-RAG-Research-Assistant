@@ -40,6 +40,10 @@ class QueryRequest(BaseModel):
     filter_doc_ids: Optional[list[str]] = Field(
         default=None, description="Restrict search to specific document IDs"
     )
+    conversation_history: Optional[list[dict]] = Field(
+        default=None,
+        description="Prior conversation messages [{role: user|assistant, content: str}]"
+    )
 
 
 class Citation(BaseModel):

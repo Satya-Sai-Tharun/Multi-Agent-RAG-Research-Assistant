@@ -1,104 +1,191 @@
 "use client";
 
-import { useState } from "react";
-import { Sparkles } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import {
+  Plus, MessageSquare, Trash2, Brain, ChevronRight, Layers
+} from "lucide-react";
+import dynamic from "next/dynamic";
 import UploadWidget from "@/components/Upload";
-import ChatInterface from "@/components/Chat";
 import DocumentManager from "@/components/DocumentManager";
 import StatusBar from "@/components/StatusBar";
-import { UploadResponse } from "@/lib/api";
+import { useAppStore } from "@/lib/store";
+
+// Lazy-load Chat to avoid SSR localStorage issues
+const ChatInterface = dynamic(() => import("@/components/Chat"), { ssr: false });
 
 export default function HomePage() {
+  const { sessions, activeSessionId, createSession, setActiveSession, deleteSession, _hasHydrated } = useAppStore();
   const [totalChunks, setTotalChunks] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const handleUploadSuccess = (response: UploadResponse) => {
-    // Trigger doc list re-fetch
-    setRefreshTrigger((v) => v + 1);
-  };
+  // Initialize first session if empty
+  useEffect(() => {
+    // Only run after hydration is complete to prevent overriding persisted state
+    if (_hasHydrated) {
+      if (sessions.length === 0) {
+        createSession();
+      } else if (!activeSessionId) {
+        setActiveSession(sessions[0].id);
+      }
+    }
+  }, [_hasHydrated, sessions.length, activeSessionId, createSession, setActiveSession]);
+
+  const handleNewChat = useCallback(() => {
+    createSession();
+  }, [createSession]);
+
+  const handleDeleteSession = useCallback(
+    (id: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      deleteSession(id);
+    },
+    [deleteSession]
+  );
+
+  const handleUploadSuccess = useCallback(() => {
+    setRefreshTrigger((t) => t + 1);
+  }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--bg-primary)]">
-      {/* Ambient background glows */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 overflow-hidden"
-        style={{ zIndex: 0 }}
-      >
-        <div
-          style={{
-            position: "absolute", top: "-20%", left: "-10%",
-            width: "600px", height: "600px",
-            background: "radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)",
-            borderRadius: "50%",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute", bottom: "-20%", right: "-5%",
-            width: "500px", height: "500px",
-            background: "radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%)",
-            borderRadius: "50%",
-          }}
-        />
-      </div>
-
-      {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
-      <aside className="sidebar relative z-10 flex flex-col gap-0">
-        {/* Logo */}
-        <div className="px-5 py-5 border-b border-[var(--border-subtle)]">
-          <div className="flex items-center gap-3">
+    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg-primary)" }}>
+      {/* ─── Sidebar ──────────────────────────────────────────────────────── */}
+      <aside className="sidebar overflow-y-auto flex-col">
+        {/* Branding */}
+        <div className="px-5 pt-6 pb-4">
+          <div className="flex items-center gap-3 mb-1">
             <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
               style={{ background: "var(--accent-gradient)" }}
             >
-              <Sparkles size={18} className="text-white" />
+              <Brain size={16} className="text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-[var(--text-primary)] leading-tight">
+              <h1 className="text-[13px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
                 RAG Research
               </h1>
-              <p className="text-[11px] text-[var(--text-muted)]">Multi-Agent Assistant</p>
+              <p className="text-[10px] font-medium tracking-widest uppercase" style={{ color: "var(--text-muted)" }}>
+                Intelligence Layer
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Sidebar Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          <UploadWidget onUploadSuccess={handleUploadSuccess} />
+        <div className="divider mx-4" />
+
+        {/* New Chat Button */}
+        <div className="px-3 mb-3">
+          <button
+            id="new-chat-btn"
+            onClick={handleNewChat}
+            className="btn-primary w-full text-[13px] py-2.5 rounded"
+            style={{ borderRadius: "var(--radius-xs)" }}
+          >
+            <Plus size={15} strokeWidth={2.5} />
+            New Chat
+          </button>
+        </div>
+
+        {/* Chat Sessions */}
+        <div className="flex-1 px-2 mb-2">
+          <p className="text-[10px] font-semibold tracking-widest uppercase px-2 mb-2" style={{ color: "var(--text-muted)" }}>
+            Sessions
+          </p>
+          {sessions.length === 0 ? (
+            <p className="text-[12px] px-2 py-4 text-center" style={{ color: "var(--text-muted)" }}>
+              No sessions yet
+            </p>
+          ) : (
+            <ul className="space-y-0.5">
+              {sessions.map((session) => (
+                <li key={session.id}>
+                  <div
+                    className={`session-item w-full text-left group ${activeSessionId === session.id ? "active" : ""}`}
+                    onClick={() => setActiveSession(session.id)}
+                    id={`session-${session.id}`}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        setActiveSession(session.id);
+                      }
+                    }}
+                  >
+                    <MessageSquare
+                      size={14}
+                      className="flex-shrink-0"
+                      style={{ color: activeSessionId === session.id ? "var(--accent-blue)" : "var(--text-muted)" }}
+                    />
+                    <span
+                      className="flex-1 text-[13px] truncate font-medium"
+                      style={{ color: activeSessionId === session.id ? "var(--text-primary)" : "var(--text-secondary)" }}
+                    >
+                      {session.title}
+                    </span>
+                    {sessions.length > 1 && (
+                      <button
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/10"
+                        onClick={(e) => handleDeleteSession(session.id, e)}
+                        title="Delete session"
+                      >
+                        <Trash2 size={12} style={{ color: "var(--text-muted)" }} />
+                      </button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="divider mx-4" />
+
+        {/* Knowledge Base */}
+        <div className="px-3 pb-2 space-y-3">
+          <UploadWidget onSuccess={handleUploadSuccess} />
           <DocumentManager
             refreshTrigger={refreshTrigger}
             onDocumentsChange={setTotalChunks}
           />
         </div>
 
-        {/* Sidebar Footer */}
-        <div className="px-4 py-3 border-t border-[var(--border-subtle)]">
-          <p className="text-[11px] text-[var(--text-muted)] text-center">
-            Powered by Ollama · ChromaDB · FastAPI
-          </p>
+        {/* Footer */}
+        <div
+          className="px-4 py-3 mt-auto border-t"
+          style={{ borderColor: "var(--border-subtle)" }}
+        >
+          <div className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}>
+            <Layers size={11} />
+            <span>{totalChunks} chunks indexed</span>
+          </div>
         </div>
       </aside>
 
-      {/* ── Main Panel ──────────────────────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col overflow-hidden relative z-10">
+      {/* ─── Main Chat Area ───────────────────────────────────────────────── */}
+      <main className="flex-1 flex flex-col overflow-hidden" style={{ background: "var(--bg-primary)" }}>
         {/* Top Bar */}
-        <header className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)] bg-[rgba(10,11,15,0.6)] backdrop-blur-md">
-          <div>
-            <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-              Research Chat
-            </h2>
-            <p className="text-xs text-[var(--text-muted)]">
-              {totalChunks > 0
-                ? `${totalChunks} chunks indexed and ready`
-                : "No documents ingested yet"}
-            </p>
+        <header
+          className="flex items-center justify-between px-6 py-3 flex-shrink-0"
+          style={{ borderBottom: `1px solid var(--border-subtle)` }}
+        >
+          <div className="flex items-center gap-2">
+            <ChevronRight size={14} style={{ color: "var(--text-muted)" }} />
+            <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
+              {sessions.find((s) => s.id === activeSessionId)?.title ?? "Research Chat"}
+            </span>
           </div>
           <StatusBar />
         </header>
 
         {/* Chat */}
-        <ChatInterface totalChunks={totalChunks} />
+        <div className="flex-1 overflow-hidden">
+          {activeSessionId && (
+            <ChatInterface
+              key={activeSessionId}
+              sessionId={activeSessionId}
+              totalChunks={totalChunks}
+            />
+          )}
+        </div>
       </main>
     </div>
   );

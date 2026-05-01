@@ -114,6 +114,11 @@ export async function checkHealth(): Promise<HealthStatus> {
   return res.json();
 }
 
+export interface ConversationMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 /**
  * Query with streaming SSE.
  * Calls onMeta once, onToken for each token, onDone when finished.
@@ -126,13 +131,19 @@ export async function queryStream(
     onToken?: (token: string) => void;
     onDone?: () => void;
     onError?: (err: Error) => void;
-  }
+  },
+  conversationHistory?: ConversationMessage[]
 ): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/query`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, stream: true, filter_doc_ids: filterDocIds }),
+      body: JSON.stringify({
+        query,
+        stream: true,
+        filter_doc_ids: filterDocIds,
+        conversation_history: conversationHistory ?? [],
+      }),
     });
 
     if (!res.ok) {
@@ -169,3 +180,4 @@ export async function queryStream(
     callbacks?.onError?.(err as Error);
   }
 }
+
