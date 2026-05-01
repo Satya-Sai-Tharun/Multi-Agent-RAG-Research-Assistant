@@ -125,7 +125,7 @@ The UI will be available at: http://localhost:3000
 Edit `backend/.env` to change models or chunk settings:
 
 ```env
-LLM_MODEL=gemma:2b             # or llama3:8b
+LLM_MODEL=gemma4:latest           # or llama3:8b
 EMBEDDING_MODEL=nomic-embed-text
 CHUNK_SIZE=500                 # tokens per chunk
 CHUNK_OVERLAP=50               # overlap between chunks
