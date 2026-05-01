@@ -24,6 +24,7 @@ export interface Document {
   doc_id: string;
   name: string;
   chunk_count: number;
+  status?: string;
   uploaded_at?: string;
   source_url?: string;
 }
@@ -45,7 +46,12 @@ export interface StreamDone {
   type: "done";
 }
 
-export type StreamEvent = StreamMeta | StreamToken | StreamDone;
+export interface StreamStateChange {
+  type: "state_change";
+  node: string;
+}
+
+export type StreamEvent = StreamStateChange | StreamMeta | StreamToken | StreamDone;
 
 export interface HealthStatus {
   status: string;
@@ -131,6 +137,7 @@ export async function queryStream(
     onToken?: (token: string) => void;
     onDone?: () => void;
     onError?: (err: Error) => void;
+    onStateChange?: (node: string) => void;
   },
   conversationHistory?: ConversationMessage[]
 ): Promise<void> {
@@ -167,7 +174,8 @@ export async function queryStream(
         if (line.startsWith("data: ")) {
           try {
             const event: StreamEvent = JSON.parse(line.slice(6));
-            if (event.type === "meta") callbacks?.onMeta?.(event);
+            if (event.type === "state_change") callbacks?.onStateChange?.(event.node);
+            else if (event.type === "meta") callbacks?.onMeta?.(event);
             else if (event.type === "token") callbacks?.onToken?.(event.content);
             else if (event.type === "done") callbacks?.onDone?.();
           } catch {

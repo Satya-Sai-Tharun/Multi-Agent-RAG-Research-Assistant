@@ -10,7 +10,6 @@ This ensures 100% compatibility with Python 3.14 without requiring C++ compilers
 import logging
 import os
 import pickle
-import uuid
 from typing import Optional
 
 import numpy as np

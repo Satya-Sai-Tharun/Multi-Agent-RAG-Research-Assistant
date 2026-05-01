@@ -7,7 +7,7 @@ Responsibilities:
   - Ensure grounded, hallucination-minimized responses with inline citations
 """
 import logging
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 
 from agents.base import BaseAgent
 from core.ollama_client import ollama_client

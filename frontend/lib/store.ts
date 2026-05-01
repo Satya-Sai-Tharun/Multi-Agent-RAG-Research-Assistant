@@ -18,6 +18,7 @@ export interface HistoryMessage {
   subQueries?: string[];
   isMultiHop?: boolean;
   strategy?: string;
+  activeNode?: string;
 }
 
 interface AppState {

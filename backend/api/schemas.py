@@ -1,9 +1,8 @@
 """
 API Request / Response Schemas (Pydantic v2)
 """
-from datetime import datetime
 from typing import Optional, Any
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 
 # ─── Upload ───────────────────────────────────────────────────────────────────
@@ -68,6 +67,7 @@ class DocumentInfo(BaseModel):
     doc_id: str
     name: str
     chunk_count: int
+    status: str = "ready"
     uploaded_at: Optional[str] = None
     source_url: Optional[str] = None
 

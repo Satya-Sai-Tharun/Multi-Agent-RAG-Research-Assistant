@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import {
-  FileText, Trash2, RefreshCw, Database, ExternalLink, Clock, FileCheck2
+  FileText, Trash2, RefreshCw, Database, ExternalLink, Clock, FileCheck2, Loader2
 } from "lucide-react";
 import { fetchDocuments, deleteDocument, Document } from "@/lib/api";
 
@@ -32,6 +32,22 @@ export default function DocumentManager({
       setIsLoading(false);
     }
   }, [onDocumentsChange]);
+
+  // Poll for status updates if any document is processing
+  useEffect(() => {
+    const hasProcessing = documents.some((d) => d.status === "processing");
+    if (!hasProcessing) return;
+
+    const intervalId = setInterval(() => {
+      fetchDocuments().then((docs) => {
+        setDocuments(docs);
+        const total = docs.reduce((sum, d) => sum + d.chunk_count, 0);
+        onDocumentsChange(total);
+      }).catch(console.error);
+    }, 2000); // poll every 2 seconds
+
+    return () => clearInterval(intervalId);
+  }, [documents, onDocumentsChange]);
 
   useEffect(() => { loadDocuments(); }, [loadDocuments, refreshTrigger]);
 
@@ -122,9 +138,19 @@ export default function DocumentManager({
                   {doc.name}
                 </p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[11px] font-medium text-[var(--success)] bg-[rgba(52,211,153,0.1)] px-1.5 py-0.5 rounded uppercase tracking-wider">
-                    {doc.chunk_count} {doc.chunk_count === 1 ? 'CHUNK' : 'CHUNKS'}
-                  </span>
+                  {doc.status === "processing" ? (
+                    <span className="text-[11px] font-medium text-[var(--accent-primary)] bg-[rgba(46,91,255,0.1)] px-1.5 py-0.5 rounded tracking-wider flex items-center gap-1">
+                      <Loader2 size={10} className="animate-spin" /> PROCESSING
+                    </span>
+                  ) : doc.status === "failed" ? (
+                    <span className="text-[11px] font-medium text-[var(--error)] bg-[rgba(255,180,171,0.1)] px-1.5 py-0.5 rounded tracking-wider">
+                      FAILED
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-medium text-[var(--success)] bg-[rgba(52,211,153,0.1)] px-1.5 py-0.5 rounded uppercase tracking-wider">
+                      {doc.chunk_count} {doc.chunk_count === 1 ? 'CHUNK' : 'CHUNKS'}
+                    </span>
+                  )}
                   {doc.uploaded_at && (
                     <>
                       <span className="text-[var(--border-medium)]">·</span>

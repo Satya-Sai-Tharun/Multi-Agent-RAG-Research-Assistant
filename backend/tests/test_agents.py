@@ -3,7 +3,7 @@ Backend test suite — basic smoke tests for agents and API endpoints.
 Run with: pytest backend/tests/ -v
 """
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 
 # ─── Ingestion Agent Tests ────────────────────────────────────────────────────

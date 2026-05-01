@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
-  Loader2, Bot, User, BookOpen, ChevronDown, ChevronUp, Zap, Network, ArrowUp, Sparkles
+  Loader2, Bot, User, BookOpen, ChevronDown, ChevronUp, Zap, Network, ArrowUp, Sparkles, Database
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { queryStream, Citation, StreamMeta } from "@/lib/api";
@@ -17,6 +17,7 @@ interface Message {
   subQueries?: string[];
   isMultiHop?: boolean;
   strategy?: string;
+  activeNode?: string;
 }
 
 interface ChatInterfaceProps {
@@ -91,6 +92,12 @@ export default function ChatInterface({
             subQueries: meta.sub_queries,
             isMultiHop: meta.is_multi_hop,
             strategy: meta.strategy,
+            activeNode: "synthesizer", // once we have meta, we are synthesizing
+          });
+        },
+        onStateChange: (node) => {
+          updateMessage(sessionId, assistantId, {
+            activeNode: node,
           });
         },
         onToken: (token) => {
@@ -98,7 +105,7 @@ export default function ChatInterface({
           updateMessage(sessionId, assistantId, { content: accumulated });
         },
         onDone: () => {
-          updateMessage(sessionId, assistantId, { isStreaming: false });
+          updateMessage(sessionId, assistantId, { isStreaming: false, activeNode: "done" });
           setIsLoading(false);
         },
         onError: (err) => {
@@ -245,6 +252,23 @@ function MessageBubble({
 
       {/* Content */}
       <div className={`flex-1 flex flex-col gap-2 max-w-[95%] ${isUser ? "items-end" : "items-start"}`}>
+        {/* Agent Workflow Stepper (only for assistant while streaming) */}
+        {!isUser && message.isStreaming && message.activeNode && (
+          <div className="flex items-center gap-2 mb-2 text-xs font-medium px-3 py-1.5 rounded-full bg-[var(--bg-card-high)] border border-[var(--border-light)] w-max">
+            <span className={`flex items-center gap-1.5 ${message.activeNode === 'planner' ? 'text-[var(--accent-primary)] animate-pulse' : 'text-[var(--text-muted)]'}`}>
+              <Zap size={12} /> Planning
+            </span>
+            <span className="text-[var(--border-medium)]">›</span>
+            <span className={`flex items-center gap-1.5 ${message.activeNode === 'retriever' ? 'text-[var(--accent-primary)] animate-pulse' : 'text-[var(--text-muted)]'}`}>
+              <Database size={12} /> Retrieving
+            </span>
+            <span className="text-[var(--border-medium)]">›</span>
+            <span className={`flex items-center gap-1.5 ${message.activeNode === 'synthesizer' ? 'text-[var(--accent-primary)] animate-pulse' : 'text-[var(--text-muted)]'}`}>
+              <Bot size={12} /> Synthesizing
+            </span>
+          </div>
+        )}
+
         {/* Meta chips */}
         {!isUser && (message.isMultiHop || message.strategy) && (
           <div className="flex flex-wrap gap-1.5 mb-1">

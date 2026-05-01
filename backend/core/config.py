@@ -4,7 +4,6 @@ Loads from environment variables or .env file.
 """
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import Optional
 import os
 
 
@@ -20,6 +19,7 @@ class Settings(BaseSettings):
     # Upgrade to llama3.2:3b — significantly better reasoning than gemma:2b
     # while still fast on Apple Silicon / CPU. Falls back to gemma:2b if unavailable.
     llm_model: str = Field(default="llama3.2:3b")
+    planner_model: str = Field(default="llama3.2:1b") # Faster routing model
     embedding_model: str = Field(default="nomic-embed-text")
 
     # ─── LLM Performance Tuning ───────────────────────────────────────

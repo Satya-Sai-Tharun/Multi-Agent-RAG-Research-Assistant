@@ -93,3 +93,10 @@ Rules:
 Original Query: {query}
 
 Refined Query:"""
+
+HYDE_PROMPT = """\
+You are an expert researcher. Please write a hypothetical, highly plausible paragraph that directly answers the following query. Write as if you are a textbook or an authoritative document. Do not include introductory or concluding remarks, just the factual content.
+
+Query: {query}
+
+Hypothetical Answer:"""
