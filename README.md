@@ -54,7 +54,7 @@ Frontend (Next.js)
 ### 1. Install Ollama Models
 
 ```bash
-ollama pull gemma:2b          # LLM for synthesis & planning
+ollama pull gemma4:latest          # LLM for synthesis & planning
 ollama pull nomic-embed-text  # Embedding model
 ollama serve                  # Start Ollama server (if not already running)
 ```
