@@ -131,8 +131,8 @@ export default function ChatInterface({
                 >
                   <MessageBubble
                     message={msg as Message}
-                    showCitations={expandedCitations.has(msg.id)}
-                    onToggleCitations={() => toggleCitations(msg.id)}
+                    showCitations={expandedCitations.has(msg.id!)}
+                    onToggleCitations={() => toggleCitations(msg.id!)}
                   />
                 </motion.div>
               ))}
